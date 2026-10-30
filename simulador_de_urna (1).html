@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simulador de Urna Eletrônica TSE & SISTOT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Inter', Arial, Helvetica, sans-serif;
+            background: radial-gradient(circle at top, #cbd5e1 0%, #94a3b8 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        /* Corpo externo da Urna TSE */
+        .urna-shell {
+            background: linear-gradient(145deg, #e8e5dc 0%, #dcd8cc 100%);
+            border: 2px solid #b8b4a8;
+            border-bottom: 6px solid #9e9a8e;
+            border-right: 5px solid #aba79b;
+            border-radius: 12px;
+            box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35), inset 0 2px 4px rgba(255,255,255,0.7);
+            width: 100%;
+            max-width: 940px;
+            position: relative;
+        }
+
+        /* Moldura da Tela LCD */
+        .lcd-bezel {
+            background-color: #111315;
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: inset 0 3px 8px rgba(0,0,0,0.8), 0 2px 0 rgba(255,255,255,0.6);
+        }
+
+        .lcd-screen {
+            background-color: #ffffff;
+            height: 380px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border-radius: 2px;
+            user-select: none;
+        }
+
+        @media (max-width: 640px) {
+            .lcd-screen {
+                height: 330px;
+            }
+        }
+
+        /* Barra Superior Estilo TSE */
+        .tse-progress-bar {
+            display: flex;
+            align-items: center;
+            background-color: #d4d4d8;
+            height: 26px;
+            margin: 6px 8px 0 8px;
+            border-radius: 12px;
+            overflow: hidden;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .tse-tab-active {
+            background-color: #09090b;
+            color: #ffffff;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 22px 0 14px;
+            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%);
+        }
+
+        .tse-tab-next {
+            color: #71717a;
+            padding-left: 12px;
+        }
+
+        /* Caixas de Dígitos */
+        .digit-slot {
+            width: 46px;
+            height: 58px;
+            border: 2px solid #18181b;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 38px;
+            font-weight: 700;
+            color: #09090b;
+            background: #fff;
+            margin-right: 6px;
+            line-height: 1;
+        }
+
+        @media (max-width: 640px) {
+            .digit-slot {
+                width: 40px;
+                height: 50px;
+                font-size: 32px;
+            }
+        }
+
+        .digit-slot.active-blink::after {
+            content: '';
+            width: 22px;
+            height: 3px;
+            background-color: #18181b;
+            margin-top: 32px;
+            animation: cursorBlink 0.65s steps(2, start) infinite;
+        }
+
+        @keyframes cursorBlink {
+            to { visibility: hidden; }
+        }
+
+        /* Teclado Físico da Urna */
+        .keypad-panel {
+            background: linear-gradient(180deg, #2d3136 0%, #22252a 100%);
+            border: 3px solid #3f444c;
+            border-radius: 8px;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.6);
+        }
+
+        .key-btn {
+            border-radius: 6px;
+            font-weight: 800;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            transition: transform 0.05s ease, box-shadow 0.05s ease, filter 0.05s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            padding-left: 12px;
+        }
+
+        .key-btn:active, .key-btn.pressed {
+            transform: translateY(3px);
+            filter: brightness(0.92);
+        }
+
+        .key-num {
+            background: linear-gradient(180deg, #434950 0%, #2f353b 100%);
+            color: #ffffff;
+            font-size: 24px;
+            box-shadow: 0 4px 0 #15181b, inset 0 1px 1px rgba(255,255,255,0.2);
+            width: 68px;
+            height: 50px;
+            border: 1px solid #1f2327;
+        }
+
+        .key-num:active, .key-num.pressed {
+            box-shadow: 0 1px 0 #15181b !important;
+        }
+
+        @media (max-width: 640px) {
+            .key-num {
+                width: 62px;
+                height: 46px;
+                font-size: 21px;
+            }
+        }
+
+        /* Pontos em Braille simulados */
+        .braille-dots {
+            position: absolute;
+            right: 8px;
+            bottom: 6px;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.32);
+            letter-spacing: 1px;
+            line-height: 1;
+        }
+
+        /* Teclas de Ação (Branco, Corrige, Confirma) */
+        .key-action {
+            align-items: center;
+            padding-left: 0;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+            width: 86px;
+        }
+
+        @media (max-width: 640px) {
+            .key-action {
+                width: 78px;
+                font-size: 12px;
+            }
+        }
+
+        .key-branco {
+            background: linear-gradient(180deg, #ffffff 0%, #e4e4e7 100%);
+            color: #09090b;
+            height: 48px;
+            box-shadow: 0 4px 0 #9ca3af, inset 0 1px 2px #ffffff;
+            border: 1px solid #d4d4d8;
+        }
+        .key-branco:active, .key-branco.pressed {
+            box-shadow: 0 1px 0 #9ca3af !important;
+        }
+
+        .key-corrige {
+            background: linear-gradient(180deg, #ff7426 0%, #e0530c 100%);
+            color: #09090b;
+            height: 48px;
+            box-shadow: 0 4px 0 #8f3204, inset 0 1px 2px rgba(255,255,255,0.4);
+            border: 1px solid #c2410c;
+        }
+        .key-corrige:active, .key-corrige.pressed {
+            box-shadow: 0 1px 0 #8f3204 !important;
+        }
+
+        .key-confirma {
+            background: linear-gradient(180deg, #4ade80 0%, #22994e 100%);
+            color: #09090b;
+            height: 68px;
+            box-shadow: 0 5px 0 #14532d, inset 0 1px 2px rgba(255,255,255,0.45);
+            border: 1px solid #15803d;
+        }
+        .key-confirma:active, .key-confirma.pressed {
+            box-shadow: 0 1px 0 #14532d !important;
+        }
+
+        .action-braille {
+            font-size: 9px;
+            color: rgba(0, 0, 0, 0.35);
+            margin-top: 2px;
+            letter-spacing: 2px;
+        }
+
+        /* Moldura da Foto do Candidato na Urna */
+        .candidate-photo-frame {
+            width: 122px;
+            height: 162px;
+            border: 2px solid #18181b;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 2px 3px 6px rgba(0,0,0,0.18);
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 640px) {
+            .candidate-photo-frame {
+                width: 98px;
+                height: 132px;
+            }
+        }
+
+        .candidate-photo-frame img {
+            width: 100%;
+            height: calc(100% - 22px);
+            object-fit: cover;
+            object-position: center top;
+            display: block;
+            background: #e2e8f0;
+        }
+
+        .candidate-photo-caption {
+            height: 22px;
+            width: 100%;
+            background: #ffffff;
+            border-top: 1px solid #18181b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            color: #09090b;
+        }
+
+        /* Animação da Barra de Gravação antes do FIM */
+        @keyframes progressFill {
+            from { width: 0%; }
+            to { width: 100%; }
+        }
+        .animate-fim-bar {
+            animation: progressFill 1.15s linear forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Barra Superior de Controle e Acessibilidade -->
+    <div class="w-full max-w-[940px] flex flex-wrap items-center justify-between gap-2 bg-slate-900/90 text-white px-4 py-2.5 rounded-xl shadow-lg backdrop-blur-sm">
+        <div class="flex items-center gap-2.5">
+            <span class="inline-block w-3 h-3 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="font-bold text-sm md:text-base tracking-tight">Simulador Oficial Urna Eletrônica + SISTOT</span>
+            <span class="hidden sm:inline-block text-xs bg-slate-700 text-slate-200 px-2 py-0.5 rounded-md font-mono">Teclado Físico Ativo</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Botão Colinha no Mobile/Desktop -->
+            <button id="btn-toggle-colinha" onclick="toggleColinha()" class="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow">
+                <span>📋 Colinha (13 / 22)</span>
+            </button>
+
+            <!-- Botão de Som -->
+            <button id="btn-sound-toggle" onclick="toggleSound()" class="text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow">
+                <span id="sound-icon">🔊</span>
+                <span id="sound-label">Som Ativo</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- CORPO DA URNA ELETRÔNICA -->
+    <div class="urna-shell p-4 sm:p-6 md:p-8">
+
+        <!-- COLINHA ELEITORAL FLUTUANTE (Clicável para voto rápido) -->
+        <div id="colinha-card" class="mb-4 md:mb-0 md:absolute md:-left-4 md:bottom-6 z-30 bg-white border-2 border-[#162847] rounded-xl shadow-2xl w-full md:w-56 overflow-hidden transition-all">
+            <div class="bg-[#162847] text-white px-3 py-2 flex items-center justify-between">
+                <div class="text-xs font-extrabold leading-tight uppercase tracking-wide">
+                    Colinha Eleitoral<br>
+                    <span class="text-[10px] font-normal text-blue-200">Clique para preencher</span>
+                </div>
+                <button onclick="toggleColinha()" class="text-xs bg-blue-900/80 hover:bg-blue-800 px-2 py-0.5 rounded-full font-bold">−</button>
+            </div>
+            <div class="p-2.5 flex flex-row md:flex-col gap-2 bg-slate-50">
+                <!-- Atalho 13 -->
+                <button onclick="quickVoteFill('13')" class="flex-1 flex items-center justify-between p-2 rounded-lg bg-white hover:bg-red-50 border border-slate-200 hover:border-red-300 transition text-left group">
+                    <div>
+                        <div class="text-xs font-extrabold text-slate-800 group-hover:text-red-700">Lula (PT)</div>
+                        <div class="text-[10px] text-slate-500">Presidente</div>
+                    </div>
+                    <div class="flex gap-1">
+                        <span class="w-6 h-7 border-2 border-slate-800 rounded flex items-center justify-center font-mono font-bold text-sm bg-white">1</span>
+                        <span class="w-6 h-7 border-2 border-slate-800 rounded flex items-center justify-center font-mono font-bold text-sm bg-white">3</span>
+                    </div>
+                </button>
+                <!-- Atalho 22 -->
+                <button onclick="quickVoteFill('22')" class="flex-1 flex items-center justify-between p-2 rounded-lg bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-left group">
+                    <div>
+                        <div class="text-xs font-extrabold text-slate-800 group-hover:text-blue-700">Flávio B. (PL)</div>
+                        <div class="text-[10px] text-slate-500">Presidente</div>
+                    </div>
+                    <div class="flex gap-1">
+                        <span class="w-6 h-7 border-2 border-slate-800 rounded flex items-center justify-center font-mono font-bold text-sm bg-white">2</span>
+                        <span class="w-6 h-7 border-2 border-slate-800 rounded flex items-center justify-center font-mono font-bold text-sm bg-white">2</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 md:gap-7 items-center">
+
+            <!-- COLUNA ESQUERDA: TELA LCD DA URNA -->
+            <div class="lg:col-span-7 flex flex-col gap-3">
+                <div class="lcd-bezel">
+                    <div class="lcd-screen" id="lcd-screen">
+
+                        <!-- TELA DE VOTAÇÃO ATIVA -->
+                        <div id="view-voting" class="h-full flex flex-col justify-between">
+                            
+                            <!-- Topo da Tela: Barra de Progresso TSE + TREINAMENTO -->
+                            <div>
+                                <div class="tse-progress-bar">
+                                    <div class="tse-tab-active">Presidente</div>
+                                    <div class="tse-tab-next">Fim</div>
+                                </div>
+                                <div class="text-center text-[11px] font-extrabold text-zinc-400 tracking-widest mt-0.5">
+                                    TREINAMENTO
+                                </div>
+                            </div>
+
+                            <!-- Corpo Central da Tela -->
+                            <div class="px-4 sm:px-6 flex-1 flex flex-col justify-start relative">
+                                <div id="label-seu-voto" class="text-xs sm:text-sm font-bold text-zinc-800 uppercase tracking-wide">
+                                    SEU VOTO PARA
+                                </div>
+
+                                <div class="text-xl sm:text-2xl font-black text-zinc-900 mt-0.5 mb-2">
+                                    Presidente
+                                </div>
+
+                                <!-- Linha com Caixas de Números e Foto à Direita -->
+                                <div class="flex justify-between items-start gap-3">
+                                    <div class="flex-1">
+                                        <!-- Caixas dos 2 Dígitos -->
+                                        <div id="digits-wrapper" class="flex items-center mb-2">
+                                            <span class="text-xs font-bold text-zinc-700 mr-2 hidden sm:inline">Número:</span>
+                                            <div id="slot-0" class="digit-slot active-blink"></div>
+                                            <div id="slot-1" class="digit-slot"></div>
+                                        </div>
+
+                                        <!-- Área Dinâmica: Dados do Candidato / Branco / Nulo -->
+                                        <div id="candidate-details" class="min-h-[115px] flex flex-col justify-center">
+                                            <!-- Preenchido via JavaScript -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Moldura da Foto do Candidato (Direita) -->
+                                    <div id="photo-container" class="candidate-photo-frame hidden">
+                                        <img id="candidate-img" src="" alt="Foto do Candidato">
+                                        <div class="candidate-photo-caption">PRESIDENTE</div>
+                                    </div>
+
+                                    <!-- Avatar Intérprete de Libras (quando sem foto de candidato) -->
+                                    <div id="libras-box" class="w-[105px] h-[135px] sm:w-[120px] sm:h-[150px] flex flex-col items-center justify-end pointer-events-none select-none opacity-95">
+                                        <svg viewBox="0 0 140 160" class="w-full h-full">
+                                            <defs>
+                                                <linearGradient id="suitGrad" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stop-color="#1f2937"/>
+                                                    <stop offset="100%" stop-color="#0f172a"/>
+                                                </linearGradient>
+                                            </defs>
+                                            <!-- Cabelo -->
+                                            <path d="M42 52 C40 24, 98 24, 98 52 C102 68, 96 85, 92 88 L48 88 C44 85, 38 68, 42 52 Z" fill="#271c19"/>
+                                            <!-- Pescoço e Rosto -->
+                                            <rect x="61" y="72" width="18" height="18" rx="4" fill="#d6a586"/>
+                                            <ellipse cx="70" cy="54" rx="20" ry="23" fill="#e5b899"/>
+                                            <!-- Franja -->
+                                            <path d="M50 42 Q68 30 89 45 Q85 30 68 31 Q52 32 50 42 Z" fill="#271c19"/>
+                                            <!-- Olhos e Sorriso -->
+                                            <circle cx="62" cy="52" r="2.2" fill="#1e293b"/>
+                                            <circle cx="78" cy="52" r="2.2" fill="#1e293b"/>
+                                            <path d="M64 64 Q70 68 76 64" stroke="#8c4a32" stroke-width="2" fill="none" stroke-linecap="round"/>
+                                            <!-- Blazer Preto (Intérprete Libras) -->
+                                            <path d="M24 158 L34 94 C36 86, 50 84, 60 84 L80 84 C90 84, 104 86, 106 94 L116 158 Z" fill="url(#suitGrad)"/>
+                                            <!-- Mãos em sinal de Libras -->
+                                            <ellipse cx="68" cy="110" rx="11" ry="6" fill="#e5b899" transform="rotate(-12 68 110)"/>
+                                            <ellipse cx="72" cy="128" rx="11" ry="6" fill="#d6a586" transform="rotate(8 72 128)"/>
+                                            <text x="70" y="153" text-anchor="middle" fill="#cbd5e1" font-size="9" font-weight="bold">LIBRAS</text>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Rodapé Oficial de Instruções -->
+                            <div id="lcd-footer" class="border-t-2 border-zinc-900 px-4 py-2 bg-white text-[11px] sm:text-xs leading-snug text-zinc-900">
+                                <div class="font-semibold">Aperte a tecla:</div>
+                                <div class="pl-3 font-bold">CONFIRMA <span class="font-normal">para CONFIRMAR este voto</span></div>
+                                <div class="pl-3 font-bold">CORRIGE <span class="font-normal">para REINICIAR este voto</span></div>
+                            </div>
+                        </div>
+
+                        <!-- TELA DE "FIM" (VOTO COMPUTADO) -->
+                        <div id="view-fim" class="hidden h-full flex flex-col justify-between p-6 bg-white select-none cursor-pointer" onclick="skipFimWait()" title="Clique para votar novamente agora">
+                            <div class="flex justify-between items-center text-xs font-bold text-zinc-400">
+                                <span>VOTO REGISTRADO NO SISTOT</span>
+                                <span id="fim-timestamp"></span>
+                            </div>
+
+                            <div class="my-auto flex flex-col items-center justify-center">
+                                <div class="text-7xl sm:text-8xl font-black tracking-widest text-zinc-900 leading-none">
+                                    FIM
+                                </div>
+                                <div class="w-48 h-2 bg-zinc-200 rounded-full overflow-hidden mt-4">
+                                    <div id="fim-progress" class="h-full bg-emerald-600"></div>
+                                </div>
+                            </div>
+
+                            <div class="text-center text-xs font-bold text-zinc-500">
+                                <span class="text-emerald-700 font-extrabold">✔ Voto computado!</span> Liberando para o próximo eleitor... (Toque para pular)
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Emblema da Justiça Eleitoral abaixo da tela (Desktop) -->
+                <div class="hidden sm:flex items-center justify-between px-3 pt-1 text-stone-600">
+                    <div class="flex items-center gap-3">
+                        <div class="w-11 h-11 border-2 border-stone-500 rounded flex items-center justify-center font-black text-xs tracking-tighter bg-stone-200/60">
+                            TSE
+                        </div>
+                        <div class="leading-tight">
+                            <div class="font-extrabold text-sm tracking-wide uppercase">Justiça Eleitoral</div>
+                            <div class="text-[11px] text-stone-500">Urna Eletrônica • Totalização SISTOT</div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-stone-500 font-mono">
+                        Atalhos: [0-9] Digitar • [Enter] Confirma • [Backspace] Corrige
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUNA DIREITA: TECLADO DA URNA -->
+            <div class="lg:col-span-5 flex flex-col items-center">
+                
+                <!-- Topo Justiça Eleitoral acima do teclado -->
+                <div class="w-full max-w-[330px] bg-[#e2dfd5] border-2 border-[#c2beb2] rounded-t-lg px-4 py-2 flex items-center justify-between mb-1 shadow-inner">
+                    <div class="flex items-center gap-2.5">
+                        <svg class="w-8 h-8 text-stone-700" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="20" cy="20" r="12"/>
+                            <path d="M12 36 L38 28 L34 38 Z"/>
+                        </svg>
+                        <div class="leading-none">
+                            <div class="font-black text-stone-800 text-sm uppercase">Justiça</div>
+                            <div class="font-bold text-stone-700 text-sm uppercase">Eleitoral</div>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-mono font-bold text-stone-500 border border-stone-400 px-1.5 py-0.5 rounded">UE2026</span>
+                </div>
+
+                <!-- Painel Escuro de Botões -->
+                <div class="keypad-panel p-4 sm:p-5 w-full max-w-[330px] flex flex-col items-center gap-3.5">
+                    
+                    <!-- Grade Numérica 1 a 9 + 0 -->
+                    <div class="grid grid-cols-3 gap-3 sm:gap-3.5 justify-items-center">
+                        <button id="key-1" class="key-btn key-num" onclick="handleDigit('1')">1 <span class="braille-dots">⠁</span></button>
+                        <button id="key-2" class="key-btn key-num" onclick="handleDigit('2')">2 <span class="braille-dots">⠃</span></button>
+                        <button id="key-3" class="key-btn key-num" onclick="handleDigit('3')">3 <span class="braille-dots">⠉</span></button>
+
+                        <button id="key-4" class="key-btn key-num" onclick="handleDigit('4')">4 <span class="braille-dots">⠙</span></button>
+                        <button id="key-5" class="key-btn key-num" onclick="handleDigit('5')">5 <span class="braille-dots">⠑</span></button>
+                        <button id="key-6" class="key-btn key-num" onclick="handleDigit('6')">6 <span class="braille-dots">⠋</span></button>
+
+                        <button id="key-7" class="key-btn key-num" onclick="handleDigit('7')">7 <span class="braille-dots">⠛</span></button>
+                        <button id="key-8" class="key-btn key-num" onclick="handleDigit('8')">8 <span class="braille-dots">⠓</span></button>
+                        <button id="key-9" class="key-btn key-num" onclick="handleDigit('9')">9 <span class="braille-dots">⠊</span></button>
+
+                        <div></div>
+                        <button id="key-0" class="key-btn key-num" onclick="handleDigit('0')">0 <span class="braille-dots">⠚</span></button>
+                        <div></div>
+                    </div>
+
+                    <!-- Linha Inferior: BRANCO / CORRIGE / CONFIRMA -->
+                    <div class="flex items-end justify-between w-full gap-2 pt-1">
+                        <button id="key-branco" class="key-btn key-action key-branco" onclick="handleBranco()">
+                            <span>BRANCO</span>
+                            <span class="action-braille">⠃⠗</span>
+                        </button>
+                        <button id="key-corrige" class="key-btn key-action key-corrige" onclick="handleCorrige()">
+                            <span>CORRIGE</span>
+                            <span class="action-braille">⠉⠕</span>
+                        </button>
+                        <button id="key-confirma" class="key-btn key-action key-confirma" onclick="handleConfirma()">
+                            <span class="text-sm font-black">CONFIRMA</span>
+                            <span class="action-braille">⠉⠋</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- PAINEL SISTOT EM TEMPO REAL -->
+    <div class="w-full max-w-[940px] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <!-- Cabeçalho SISTOT -->
+        <div class="bg-slate-900 text-white px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 px-2.5 py-1 rounded-lg font-mono text-xs font-bold">
+                    SISTOT v4.2
+                </div>
+                <div>
+                    <h2 class="text-base sm:text-lg font-extrabold tracking-tight">Apuração e Totalização de Votos em Tempo Real</h2>
+                    <p class="text-xs text-slate-400">Cada voto confirmado na urna atualiza instantaneamente o Boletim de Urna</p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Botões para Trocar Foto Localmente caso o usuário queira subir seu próprio arquivo -->
+                <label class="cursor-pointer text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1">
+                    <span>📸 Foto 13</span>
+                    <input type="file" accept="image/*" class="hidden" onchange="uploadCustomPhoto('13', event)">
+                </label>
+                <label class="cursor-pointer text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1">
+                    <span>📸 Foto 22</span>
+                    <input type="file" accept="image/*" class="hidden" onchange="uploadCustomPhoto('22', event)">
+                </label>
+                <button onclick="openBoletimModal()" class="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition shadow">
+                    📄 Emitir Boletim (BU)
+                </button>
+                <button onclick="resetVotes()" class="text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg transition shadow">
+                    🗑️ Zerar Urna
+                </button>
+            </div>
+        </div>
+
+        <!-- Cards dos Candidatos e Contadores -->
+        <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- Card Lula (13) -->
+            <div class="border-2 border-red-100 bg-gradient-to-br from-red-50/70 to-white rounded-xl p-4 flex items-center gap-4 shadow-sm">
+                <img id="sistot-img-13" src="" alt="Lula" class="w-16 h-20 rounded-lg object-cover border-2 border-red-500 shadow-sm shrink-0 bg-slate-200">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-extrabold bg-red-600 text-white px-2 py-0.5 rounded">Nº 13 • PT</span>
+                        <span id="pct-13" class="text-sm font-black text-red-700 font-mono">0,0%</span>
+                    </div>
+                    <div class="font-extrabold text-slate-900 text-lg truncate mt-0.5">Lula</div>
+                    <div class="text-xs text-slate-500 truncate">Cargo: Presidente da República</div>
+                    <div class="w-full h-2.5 bg-red-100 rounded-full overflow-hidden mt-2">
+                        <div id="bar-13" class="h-full bg-red-600 transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="text-right pl-2">
+                    <div id="count-13" class="text-3xl sm:text-4xl font-black text-red-600 font-mono">0</div>
+                    <div class="text-[11px] font-bold text-slate-500 uppercase">Votos</div>
+                </div>
+            </div>
+
+            <!-- Card Flávio Bolsonaro (22) -->
+            <div class="border-2 border-blue-100 bg-gradient-to-br from-blue-50/70 to-white rounded-xl p-4 flex items-center gap-4 shadow-sm">
+                <img id="sistot-img-22" src="" alt="Flávio Bolsonaro" class="w-16 h-20 rounded-lg object-cover border-2 border-blue-600 shadow-sm shrink-0 bg-slate-200">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-extrabold bg-blue-700 text-white px-2 py-0.5 rounded">Nº 22 • PL</span>
+                        <span id="pct-22" class="text-sm font-black text-blue-700 font-mono">0,0%</span>
+                    </div>
+                    <div class="font-extrabold text-slate-900 text-lg truncate mt-0.5">Flávio Bolsonaro</div>
+                    <div class="text-xs text-slate-500 truncate">Cargo: Presidente da República (Senador)</div>
+                    <div class="w-full h-2.5 bg-blue-100 rounded-full overflow-hidden mt-2">
+                        <div id="bar-22" class="h-full bg-blue-700 transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="text-right pl-2">
+                    <div id="count-22" class="text-3xl sm:text-4xl font-black text-blue-700 font-mono">0</div>
+                    <div class="text-[11px] font-bold text-slate-500 uppercase">Votos</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Resumo Geral: Brancos, Nulos e Total -->
+        <div class="px-5 pb-5 grid grid-cols-3 gap-3 text-center">
+            <div class="bg-slate-100 border border-slate-200 rounded-xl p-3">
+                <div class="text-xs font-bold text-slate-500 uppercase">Votos em Branco</div>
+                <div id="count-branco" class="text-2xl font-black text-slate-800 font-mono mt-0.5">0</div>
+            </div>
+            <div class="bg-slate-100 border border-slate-200 rounded-xl p-3">
+                <div class="text-xs font-bold text-slate-500 uppercase">Votos Nulos</div>
+                <div id="count-nulo" class="text-2xl font-black text-slate-800 font-mono mt-0.5">0</div>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <div class="text-xs font-bold text-emerald-800 uppercase">Total Apurado</div>
+                <div id="count-total" class="text-2xl font-black text-emerald-700 font-mono mt-0.5">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DO BOLETIM DE URNA (IMPRESSÃO TÉRMICA DO TSE) -->
+    <div id="boletim-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-[#fffdf7] border-2 border-amber-200 rounded-xl shadow-2xl max-w-md w-full p-6 font-mono text-xs text-slate-900 relative">
+            <div class="text-center border-b-2 border-dashed border-slate-400 pb-3 mb-3">
+                <div class="font-bold text-sm">JUSTIÇA ELEITORAL DO BRASIL</div>
+                <div>TRIBUNAL SUPERIOR ELEITORAL - SISTOT</div>
+                <div class="font-bold mt-1">BOLETIM DE URNA - SEÇÃO 0001</div>
+            </div>
+            <div id="boletim-content" class="space-y-1.5 leading-relaxed">
+                <!-- Preenchido via JS -->
+            </div>
+            <div class="border-t-2 border-dashed border-slate-400 mt-4 pt-3 text-center text-[10px] text-slate-500">
+                ASSINATURA DIGITAL SHA-256 VERIFICADA<br>
+                9F86D081884C7D659A2FEAA0C55AD015A3BF4F1B2B0B822CD15D6C15B0F00A08
+            </div>
+            <button onclick="closeBoletimModal()" class="mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white font-sans font-bold py-2.5 rounded-lg transition">
+                Fechar Boletim de Urna
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* ============================================================================
+         * 1. RETRATOS OFICIAIS EM SVG EMBUTIDO (GARANTIA 100% CONTRA IMAGEM QUEBRADA)
+         *    + BUSCA AUTOMÁTICA DA FOTO REAL NA API DA WIKIPÉDIA EM PORTUGUÊS
+         * ============================================================================ */
+
+        // Retrato SVG Oficial Estilizado: Lula (Terno azul, faixa presidencial verde-amarela, barba branca)
+        const SVG_LULA = "data:image/svg+xml;utf8," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 300" width="240" height="300">
+            <defs>
+                <linearGradient id="bg13" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#bae6fd"/>
+                    <stop offset="65%" stop-color="#f0f9ff"/>
+                    <stop offset="100%" stop-color="#e2e8f0"/>
+                </linearGradient>
+                <linearGradient id="suit13" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#0f294a"/>
+                    <stop offset="100%" stop-color="#08182e"/>
+                </linearGradient>
+            </defs>
+            <rect width="240" height="300" fill="url(#bg13)"/>
+            <!-- Colunas do Palácio do Planalto ao fundo -->
+            <path d="M20 0 L35 300 L5 300 Z" fill="#ffffff" opacity="0.7"/>
+            <path d="M215 0 L235 300 L200 300 Z" fill="#ffffff" opacity="0.7"/>
+            <!-- Terno Azul Marinho -->
+            <path d="M12 300 C18 220, 58 198, 120 198 C182 198, 222 220, 228 300 Z" fill="url(#suit13)"/>
+            <!-- Camisa Branca e Gravata Vermelha/Rosa -->
+            <polygon points="94,195 146,195 120,275" fill="#ffffff"/>
+            <polygon points="113,208 127,208 131,275 120,290 109,275" fill="#e11d48"/>
+            <!-- Faixa Presidencial Verde e Amarela -->
+            <polygon points="48,206 94,196 196,300 132,300" fill="#15803d"/>
+            <polygon points="62,203 82,199 178,300 150,300" fill="#facc15"/>
+            <circle cx="114" cy="252" r="14" fill="#eab308" stroke="#a16207" stroke-width="2"/>
+            <!-- Cabelo e Barba Grisalha/Branca -->
+            <ellipse cx="120" cy="108" rx="58" ry="62" fill="#e2e8f0"/>
+            <!-- Rosto -->
+            <ellipse cx="120" cy="116" rx="48" ry="54" fill="#f1bfa3"/>
+            <!-- Cabelo Superior -->
+            <path d="M66 98 C64 52, 176 52, 174 98 C164 72, 76 72, 66 98 Z" fill="#f1f5f9"/>
+            <!-- Sobrancelhas -->
+            <path d="M88 98 Q100 92 110 97" stroke="#94a3b8" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M130 97 Q140 92 152 98" stroke="#94a3b8" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <!-- Olhos -->
+            <circle cx="99" cy="107" r="4.5" fill="#1e293b"/>
+            <circle cx="141" cy="107" r="4.5" fill="#1e293b"/>
+            <!-- Nariz -->
+            <path d="M120 106 L115 128 L126 128" stroke="#c88d70" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <!-- Barba e Bigode -->
+            <path d="M72 124 C72 178, 168 178, 168 124 C162 142, 146 150, 120 150 C94 150, 78 142, 72 124 Z" fill="#e2e8f0"/>
+            <path d="M90 135 Q120 124 150 135 Q120 144 90 135 Z" fill="#cbd5e1"/>
+            <!-- Sorriso -->
+            <path d="M100 138 Q120 151 140 138 Z" fill="#ffffff"/>
+        </svg>`);
+
+        // Retrato SVG Oficial Estilizado: Flávio Bolsonaro (Fundo persiana/bandeira, terno grafite, gravata prata/azul)
+        const SVG_FLAVIO = "data:image/svg+xml;utf8," + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 300" width="240" height="300">
+            <defs>
+                <linearGradient id="bg22" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#e2e8f0"/>
+                    <stop offset="100%" stop-color="#cbd5e1"/>
+                </linearGradient>
+                <linearGradient id="suit22" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#27272a"/>
+                    <stop offset="100%" stop-color="#18181b"/>
+                </linearGradient>
+            </defs>
+            <rect width="240" height="300" fill="url(#bg22)"/>
+            <!-- Detalhe Bandeira à Esquerda -->
+            <polygon points="0,40 78,120 55,230 0,230" fill="#3b82f6" opacity="0.35"/>
+            <circle cx="28" cy="145" r="28" fill="#22c55e" opacity="0.35"/>
+            <!-- Terno Grafite Escuro -->
+            <path d="M14 300 C20 220, 60 198, 120 198 C180 198, 220 220, 226 300 Z" fill="url(#suit22)"/>
+            <!-- Camisa Branca e Gravata Prata-Azulada -->
+            <polygon points="95,195 145,195 120,282" fill="#ffffff"/>
+            <polygon points="113,208 127,208 131,282 120,295 109,282" fill="#93c5fd"/>
+            <!-- Broche dourado na lapela -->
+            <circle cx="162" cy="248" r="5" fill="#eab308"/>
+            <!-- Pescoço e Rosto -->
+            <rect x="98" y="158" width="44" height="45" fill="#e5b597"/>
+            <ellipse cx="120" cy="114" rx="47" ry="56" fill="#f2c6ab"/>
+            <!-- Cabelo Castanho Escuro Curto -->
+            <path d="M73 102 C68 48, 172 46, 167 102 C160 72, 132 66, 108 70 C88 73, 78 84, 73 102 Z" fill="#271c18"/>
+            <!-- Sobrancelhas -->
+            <path d="M86 96 Q100 91 112 96" stroke="#271c18" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <path d="M128 96 Q140 91 154 96" stroke="#271c18" stroke-width="4" fill="none" stroke-linecap="round"/>
+            <!-- Olhos -->
+            <circle cx="99" cy="106" r="4.5" fill="#3f4d3b"/>
+            <circle cx="141" cy="106" r="4.5" fill="#3f4d3b"/>
+            <!-- Nariz -->
+            <path d="M120 105 L116 128 L126 128" stroke="#c58c6e" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <!-- Sorriso Discreto -->
+            <path d="M101 143 Q120 153 139 143" stroke="#9a5b45" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        </svg>`);
+
+        // Banco de Dados dos Candidatos
+        const CANDIDATES = {
+            "13": {
+                number: "13",
+                name: "Lula",
+                fullName: "Luiz Inácio Lula da Silva",
+                party: "PT - Partido dos Trabalhadores",
+                role: "Presidente da República",
+                photo: SVG_LULA,
+                fallback: SVG_LULA,
+                wikiSlug: "Luiz_In%C3%A1cio_Lula_da_Silva"
+            },
+            "22": {
+                number: "22",
+                name: "Flávio Bolsonaro",
+                fullName: "Flávio Nantes Bolsonaro",
+                party: "PL - Partido Liberal",
+                role: "Presidente da República (Senador)",
+                photo: SVG_FLAVIO,
+                fallback: SVG_FLAVIO,
+                wikiSlug: "Fl%C3%A1vio_Bolsonaro"
+            }
+        };
+
+        // Busca assíncrona na API REST da Wikipédia para carregar a foto oficial real quando online
+        async function fetchRealWikipediaPhotos() {
+            for (const key of Object.keys(CANDIDATES)) {
+                const cand = CANDIDATES[key];
+                try {
+                    const res = await fetch(`https://pt.wikipedia.org/api/rest_v1/page/summary/${cand.wikiSlug}`);
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    const imgUrl = (data.thumbnail && data.thumbnail.source) || (data.originalimage && data.originalimage.source);
+                    if (imgUrl) {
+                        const probe = new Image();
+                        probe.onload = () => {
+                            cand.photo = imgUrl;
+                            refreshPhotoElements();
+                        };
+                        probe.src = imgUrl;
+                    }
+                } catch (err) {
+                    // Mantém o retrato SVG embutido caso sem internet ou bloqueado
+                }
+            }
+        }
+
+        // Permite ao usuário enviar qualquer imagem do próprio computador (ex: image_685669.jpg)
+        window.uploadCustomPhoto = function(num, event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file || !CANDIDATES[num]) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                CANDIDATES[num].photo = e.target.result;
+                refreshPhotoElements();
+            };
+            reader.readAsDataURL(file);
+        };
+
+        function refreshPhotoElements() {
+            // Atualiza miniaturas do painel SISTOT
+            const img13 = document.getElementById('sistot-img-13');
+            const img22 = document.getElementById('sistot-img-22');
+            if (img13) {
+                img13.onerror = function() { this.onerror = null; this.src = CANDIDATES["13"].fallback; };
+                img13.src = CANDIDATES["13"].photo;
+            }
+            if (img22) {
+                img22.onerror = function() { this.onerror = null; this.src = CANDIDATES["22"].fallback; };
+                img22.src = CANDIDATES["22"].photo;
+            }
+            // Se o candidato estiver visível na tela da urna agora, atualiza também
+            renderScreen();
+        }
+
+        /* ============================================================================
+         * 2. SINTETIZADOR DE ÁUDIO OFICIAL DA URNA TSE (WEB AUDIO API)
+         * ============================================================================ */
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        // Bipe curto ao pressionar números, Branco ou Corrige
+        function playKeyBeep() {
+            if (!soundEnabled) return;
+            const ctx = getAudioContext();
+            if (!ctx) return;
+
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(940, now);
+
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.exponentialRampToValueAtTime(0.18, now + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.08);
+        }
+
+        // Som Oficial de Confirmação da Urna Eletrônica Brasileira ("Pirililili-piii")
+        function playUrnaFimSound() {
+            if (!soundEnabled) return;
+            const ctx = getAudioContext();
+            if (!ctx) return;
+
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            // Timbre característico da urna TSE
+            osc.type = 'triangle';
+
+            const stepDuration = 0.052; // 52ms por alternância
+            const steps = 12;
+            const freqLow = 1244.5;  // D#6
+            const freqHigh = 1318.5; // E6
+
+            for (let i = 0; i < steps; i++) {
+                const t = now + i * stepDuration;
+                osc.frequency.setValueAtTime(i % 2 === 0 ? freqLow : freqHigh, t);
+            }
+
+            // Nota final sustentada aguda
+            const sustainStart = now + steps * stepDuration;
+            const totalDuration = steps * stepDuration + 0.48;
+            osc.frequency.setValueAtTime(freqHigh, sustainStart);
+
+            // Envelope de volume limpo sem estalos
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.32, now + 0.015);
+            gain.gain.setValueAtTime(0.32, totalDuration - 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.0001, totalDuration);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start(now);
+            osc.stop(totalDuration);
+        }
+
+        window.toggleSound = function() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-icon').textContent = soundEnabled ? '🔊' : '🔇';
+            document.getElementById('sound-label').textContent = soundEnabled ? 'Som Ativo' : 'Mudo';
+            if (soundEnabled) playKeyBeep();
+        };
+
+        /* ============================================================================
+         * 3. LÓGICA DE VOTAÇÃO E APURAÇÃO SISTOT EM TEMPO REAL
+         * ============================================================================ */
+        let digits = [];
+        let mode = 'normal'; // 'normal' | 'branco' | 'nulo'
+        let isFimScreen = false;
+        let fimTimer = null;
+
+        const votes = {
+            "13": 0,
+            "22": 0,
+            "branco": 0,
+            "nulo": 0
+        };
+
+        // Elementos DOM
+        const elSlot0 = document.getElementById('slot-0');
+        const elSlot1 = document.getElementById('slot-1');
+        const elDigitsWrapper = document.getElementById('digits-wrapper');
+        const elCandidateDetails = document.getElementById('candidate-details');
+        const elPhotoContainer = document.getElementById('photo-container');
+        const elCandidateImg = document.getElementById('candidate-img');
+        const elLibrasBox = document.getElementById('libras-box');
+        const elLcdFooter = document.getElementById('lcd-footer');
+        const elLabelSeuVoto = document.getElementById('label-seu-voto');
+        const elViewVoting = document.getElementById('view-voting');
+        const elViewFim = document.getElementById('view-fim');
+
+        function renderScreen() {
+            if (isFimScreen) return;
+
+            // Atualiza os quadrados de dígitos
+            elSlot0.textContent = digits[0] || '';
+            elSlot1.textContent = digits[1] || '';
+
+            elSlot0.classList.remove('active-blink');
+            elSlot1.classList.remove('active-blink');
+
+            if (mode === 'branco') {
+                elDigitsWrapper.classList.add('hidden');
+                elPhotoContainer.classList.add('hidden');
+                elLibrasBox.classList.remove('hidden');
+                elLabelSeuVoto.classList.remove('invisible');
+                elLcdFooter.classList.remove('invisible');
+
+                elCandidateDetails.innerHTML = `
+                    <div class="text-2xl sm:text-4xl font-extrabold text-zinc-800 tracking-wide text-center sm:text-left mt-3 animate-pulse">
+                        VOTO EM BRANCO
+                    </div>
+                `;
+                return;
+            }
+
+            elDigitsWrapper.classList.remove('hidden');
+
+            // Controle do cursor piscante
+            if (digits.length === 0) {
+                elSlot0.classList.add('active-blink');
+            } else if (digits.length === 1) {
+                elSlot1.classList.add('active-blink');
+            }
+
+            // Menos de 2 dígitos digitados
+            if (digits.length < 2) {
+                mode = 'normal';
+                elCandidateDetails.innerHTML = `
+                    <div class="text-xs text-zinc-400 mt-2">
+                        Digite os 2 números do seu candidato (13 ou 22)
+                    </div>
+                `;
+                elPhotoContainer.classList.add('hidden');
+                elLibrasBox.classList.remove('hidden');
+                elLabelSeuVoto.classList.add('invisible');
+                elLcdFooter.classList.add('invisible');
+                return;
+            }
+
+            // 2 dígitos preenchidos
+            const code = digits.join('');
+            const cand = CANDIDATES[code];
+
+            elLabelSeuVoto.classList.remove('invisible');
+            elLcdFooter.classList.remove('invisible');
+
+            if (cand) {
+                mode = 'normal';
+                elLibrasBox.classList.add('hidden');
+                elPhotoContainer.classList.remove('hidden');
+
+                // Garantia contra imagem quebrada
+                elCandidateImg.onerror = function() {
+                    this.onerror = null;
+                    this.src = cand.fallback;
+                };
+                elCandidateImg.src = cand.photo;
+                elCandidateImg.alt = cand.name;
+
+                elCandidateDetails.innerHTML = `
+                    <div class="space-y-1 text-zinc-900 mt-1">
+                        <div class="text-xs sm:text-sm">
+                            <span class="text-zinc-600">Nome:</span>
+                            <span class="font-black text-base sm:text-lg uppercase ml-1">${cand.name}</span>
+                        </div>
+                        <div class="text-xs sm:text-sm">
+                            <span class="text-zinc-600">Partido:</span>
+                            <span class="font-bold ml-1">${cand.party}</span>
+                        </div>
+                        <div class="text-xs sm:text-sm">
+                            <span class="text-zinc-600">Cargo Ocupacional:</span>
+                            <span class="font-semibold ml-1">${cand.role}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // VOTO NULO (ex: igual à imagem enviada pelo usuário)
+                mode = 'nulo';
+                elPhotoContainer.classList.add('hidden');
+                elLibrasBox.classList.remove('hidden');
+
+                elCandidateDetails.innerHTML = `
+                    <div class="mt-1">
+                        <div class="text-sm sm:text-base font-bold text-zinc-900">NÚMERO ERRADO</div>
+                        <div class="text-2xl sm:text-4xl font-bold text-zinc-500 tracking-wide mt-3 sm:mt-5">
+                            VOTO NULO
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Efeito visual de clique no botão quando acionado pelo teclado físico
+        function flashButton(id) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.classList.add('pressed');
+            setTimeout(() => btn.classList.remove('pressed'), 100);
+        }
+
+        window.handleDigit = function(num) {
+            if (isFimScreen) {
+                skipFimWait();
+                return;
+            }
+            if (mode === 'branco') return;
+            if (digits.length < 2) {
+                playKeyBeep();
+                flashButton(`key-${num}`);
+                digits.push(String(num));
+                renderScreen();
+            }
+        };
+
+        window.handleBranco = function() {
+            if (isFimScreen) {
+                skipFimWait();
+                return;
+            }
+            playKeyBeep();
+            flashButton('key-branco');
+            digits = [];
+            mode = 'branco';
+            renderScreen();
+        };
+
+        window.handleCorrige = function() {
+            if (isFimScreen) {
+                skipFimWait();
+                return;
+            }
+            playKeyBeep();
+            flashButton('key-corrige');
+            digits = [];
+            mode = 'normal';
+            renderScreen();
+        };
+
+        window.handleConfirma = function() {
+            if (isFimScreen) return;
+            if (mode !== 'branco' && digits.length < 2) return;
+
+            flashButton('key-confirma');
+
+            // Contabiliza o voto no SISTOT
+            if (mode === 'branco') {
+                votes.branco++;
+            } else if (mode === 'nulo') {
+                votes.nulo++;
+            } else {
+                const code = digits.join('');
+                if (votes[code] !== undefined) {
+                    votes[code]++;
+                } else {
+                    votes.nulo++;
+                }
+            }
+
+            updateSistotPanel();
+            playUrnaFimSound();
+            showFimScreen();
+        };
+
+        // Preenche rapidamente pela Colinha Eleitoral
+        window.quickVoteFill = function(code) {
+            if (isFimScreen) skipFimWait();
+            playKeyBeep();
+            digits = code.split('');
+            mode = 'normal';
+            renderScreen();
+        };
+
+        function showFimScreen() {
+            isFimScreen = true;
+            elViewVoting.classList.add('hidden');
+            elViewFim.classList.remove('hidden');
+
+            const now = new Date();
+            document.getElementById('fim-timestamp').textContent = now.toLocaleTimeString('pt-BR');
+
+            const prog = document.getElementById('fim-progress');
+            prog.classList.remove('animate-fim-bar');
+            void prog.offsetWidth; // Reflow
+            prog.classList.add('animate-fim-bar');
+
+            clearTimeout(fimTimer);
+            fimTimer = setTimeout(() => {
+                resetToNextVoter();
+            }, 1200);
+        }
+
+        window.skipFimWait = function() {
+            if (!isFimScreen) return;
+            clearTimeout(fimTimer);
+            resetToNextVoter();
+        };
+
+        function resetToNextVoter() {
+            isFimScreen = false;
+            digits = [];
+            mode = 'normal';
+            elViewFim.classList.add('hidden');
+            elViewVoting.classList.remove('hidden');
+            renderScreen();
+        }
+
+        // Atualiza contadores e barras de porcentagem do SISTOT em tempo real
+        function updateSistotPanel() {
+            const total = votes["13"] + votes["22"] + votes.branco + votes.nulo;
+            const pct13 = total > 0 ? ((votes["13"] / total) * 100) : 0;
+            const pct22 = total > 0 ? ((votes["22"] / total) * 100) : 0;
+
+            document.getElementById('count-13').textContent = votes["13"];
+            document.getElementById('count-22').textContent = votes["22"];
+            document.getElementById('count-branco').textContent = votes.branco;
+            document.getElementById('count-nulo').textContent = votes.nulo;
+            document.getElementById('count-total').textContent = total;
+
+            document.getElementById('pct-13').textContent = pct13.toFixed(1).replace('.', ',') + '%';
+            document.getElementById('pct-22').textContent = pct22.toFixed(1).replace('.', ',') + '%';
+
+            document.getElementById('bar-13').style.width = `${pct13}%`;
+            document.getElementById('bar-22').style.width = `${pct22}%`;
+        }
+
+        window.resetVotes = function() {
+            playKeyBeep();
+            votes["13"] = 0;
+            votes["22"] = 0;
+            votes.branco = 0;
+            votes.nulo = 0;
+            updateSistotPanel();
+            resetToNextVoter();
+        };
+
+        window.toggleColinha = function() {
+            const card = document.getElementById('colinha-card');
+            card.classList.toggle('hidden');
+        };
+
+        // Modal de Boletim de Urna (BU)
+        window.openBoletimModal = function() {
+            const total = votes["13"] + votes["22"] + votes.branco + votes.nulo;
+            const now = new Date();
+            const content = document.getElementById('boletim-content');
+            content.innerHTML = `
+                <div class="flex justify-between"><span>DATA/HORA EMISSÃO:</span><span>${now.toLocaleString('pt-BR')}</span></div>
+                <div class="flex justify-between"><span>CARGO:</span><span class="font-bold">PRESIDENTE DA REPÚBLICA</span></div>
+                <hr class="border-dashed border-slate-300 my-2">
+                <div class="flex justify-between font-bold text-red-700"><span>13 - LULA (PT)</span><span>${votes["13"]} VOTO(S)</span></div>
+                <div class="flex justify-between font-bold text-blue-800"><span>22 - FLÁVIO BOLSONARO (PL)</span><span>${votes["22"]} VOTO(S)</span></div>
+                <hr class="border-dashed border-slate-300 my-2">
+                <div class="flex justify-between"><span>VOTOS EM BRANCO:</span><span>${votes.branco}</span></div>
+                <div class="flex justify-between"><span>VOTOS NULOS:</span><span>${votes.nulo}</span></div>
+                <div class="flex justify-between font-bold text-sm pt-1 border-t border-slate-300"><span>TOTAL APURADO:</span><span>${total}</span></div>
+            `;
+            const modal = document.getElementById('boletim-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closeBoletimModal = function() {
+            const modal = document.getElementById('boletim-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        };
+
+        // Suporte a Teclado Físico do Computador
+        window.addEventListener('keydown', function(e) {
+            if (e.key >= '0' && e.key <= '9') {
+                e.preventDefault();
+                handleDigit(e.key);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                handleConfirma();
+            } else if (e.key === 'Backspace' || e.key === 'Escape' || e.key === 'Delete') {
+                e.preventDefault();
+                handleCorrige();
+            } else if (e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                handleBranco();
+            }
+        });
+
+        // Inicialização imediata
+        refreshPhotoElements();
+        renderScreen();
+        updateSistotPanel();
+        fetchRealWikipediaPhotos();
+    </script>
+</body>
+</html>
